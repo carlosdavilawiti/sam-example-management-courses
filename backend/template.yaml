@@ -1,0 +1,183 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+
+Description: >
+  Demo uso básico de SAM AWS. Sistema para gestión de cursos
+Globals:
+  Function:
+    Timeout: 300
+    Runtime: nodejs12.x
+Parameters:
+  ApiGatewayStageName:
+    Type: String
+    Default: Dev
+  Environment:
+    Description: Environment
+    Default: dev
+    Type: String
+    AllowedValues:
+      - dev
+      - qa
+      - prod
+  NameProject:
+    Type: String
+    Default: management-courses
+  SuffixParametersName:
+    Type: String
+    Default: ""
+  TableCoursesName:
+    Type: String
+    Default: "courses"
+  TableAuthorsName:
+    Type: String
+    Default: "authors"
+Resources:
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'sts:AssumeRole'
+            Principal:
+              Service:
+                - states.amazonaws.com
+                - lambda.amazonaws.com
+      Policies:
+        - PolicyName: StepFunctionsPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:*'
+                  - 'lambda:*'
+                  - 'dynamodb:put'
+                  - 's3:*'
+                Resource: '*'
+
+  ClientStorage:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${NameProject}${SuffixParametersName}--client
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+  BucketPolicyClient:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Sid: PublicReadForGetBucketObjects
+            Effect: Allow
+            Principal: '*'
+            Action:
+              - 's3:GetObject'
+            Resource: !Sub arn:aws:s3:::${NameProject}${SuffixParametersName}--client/*
+      Bucket:
+        Ref: ClientStorage
+  AuthorsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: 'id'
+          AttributeType: 'S'
+      KeySchema:
+        - AttributeName: 'id'
+          KeyType: 'HASH'
+      ProvisionedThroughput:
+        ReadCapacityUnits: '5'
+        WriteCapacityUnits: '5'
+      TableName: !Sub ${TableAuthorsName}
+  CoursesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: 'id'
+          AttributeType: 'S'
+      KeySchema:
+        - AttributeName: 'id'
+          KeyType: 'HASH'
+      ProvisionedThroughput:
+        ReadCapacityUnits: '5'
+        WriteCapacityUnits: '5'
+      TableName: !Sub ${TableCoursesName}
+  # Api Gateway -
+  ManagementCoursesApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: management-courses-api
+      StageName: !Ref ApiGatewayStageName
+  CourseModel:
+    Type: AWS::ApiGateway::Model
+    Properties:
+      RestApiId: !Ref ManagementCoursesApi
+      ContentType: application/json
+      Description: Schema for course
+      Name: Course
+      Schema:
+        $schema: 'http://json-schema.org/draft-04/schema#'
+        title: CourseInputModel
+        type: object
+        items:
+          type: object
+          properties:
+            number:
+              type: integer
+            class:
+              type: string
+            salesPrice:
+              type: number
+
+  # Functions
+  GetAllAuthors:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: get-all-authors/
+      Handler: index.handler
+      Role: !GetAtt LambdaRole.Arn
+      Events:
+        ApiGet:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ManagementCoursesApi
+            Path: /courses
+            Method: get
+      Environment:
+        Variables:
+          DynamoTable: !Ref AuthorsTable
+  GetAllCourses:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: get-all-courses/
+      Handler: index.handler
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          DynamoTable: !Ref CoursesTable
+  SaveCourse:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: save-course/
+      Handler: index.handler
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          DynamoTable: !Ref CoursesTable
+  UpdateCourse:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: update-course/
+      Handler: index.handler
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          DynamoTable: !Ref CoursesTable
+
