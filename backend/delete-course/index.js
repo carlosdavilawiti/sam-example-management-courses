@@ -4,10 +4,10 @@ const dynamoLib = require('dynamo-lib');
 
 
 exports.handler = async (event, context, callback) => {
-	console.log('Event: ', JSON.stringify(event, null, 2));
+	console.log('Event: ', event);
 	
 	const pk = {
-		id: event.id
+		id: event.courseId
 	};
 	await dynamoLib.deleteItemDynamoDB(process.env.DynamoTable, pk);
 	callback(null, pk)

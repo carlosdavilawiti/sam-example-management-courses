@@ -1,0 +1,265 @@
+openapi: 3.0.1
+info:
+  title: Courses and authors
+  description: Example of using APIGateway + DynamoDB and APIGateway + Lambda + DynamoDB
+  contact:
+    name: Diego  Berrios
+    email: die.bb04@hotmail.cl
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+  version: 1.0.0
+
+x-amazon-apigateway-request-validators:
+  body:
+    validateRequestParameters: false
+    validateRequestBody: true
+  params:
+    validateRequestParameters: true
+    validateRequestBody: false
+  all:
+    validateRequestParameters: true
+    validateRequestBody: true
+
+paths:
+  /author:
+    get:
+      tags:
+        - "author"
+      summary: "Get all authors"
+      description: ""
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetAllAuthors.Arn}/invocations
+        httpMethod: POST
+        type: aws
+        responses:
+          default:
+            statusCode: 200
+            schema:
+              $ref: '#/components/responses/AuthorAll'
+      responses:
+        200:
+          $ref: '#/components/responses/AuthorAll'
+  /course:
+    get:
+      tags:
+        - "course"
+      summary: "Get all courses"
+      description: ""
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetAllCourses.Arn}/invocations
+        httpMethod: POST
+        type: aws
+        responses:
+          default:
+            statusCode: 200
+            schema:
+              $ref: '#/components/responses/CourseAll'
+      responses:
+        200:
+          $ref: '#/components/responses/CourseAll'
+    post:
+      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SaveCourse.Arn}/invocations
+        httpMethod: POST
+        type: aws
+        requestTemplates:
+          application/json: |
+            {
+                "title" : $input.json('$.title'),
+                "authorId" : $input.json('$.authorId'),
+                "length" : $input.json('$.length'),
+                "category" : $input.json('$.category'),
+                "watchHref" : $input.json('$.watchHref')
+            }
+        responses:
+          default:
+            statusCode: 201
+            schema:
+              $ref: '#/components/responses/Empty'
+      summary: Add a course
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Course'
+      responses:
+        201:
+          $ref: '#/components/responses/Empty'
+  /course/{courseId}:
+    get:
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetCourse.Arn}/invocations
+        httpMethod: POST
+        type: aws
+        passthroughBehavior: "WHEN_NO_TEMPLATES"
+        requestTemplates:
+          application/json: |
+            {
+              "courseId": "$input.params('courseId')"
+            }
+        responses:
+          default:
+            statusCode: 200
+            schema:
+              $ref: '#/components/responses/Empty'
+      summary: Get a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          $ref: '#/components/responses/Course'
+    put:
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UpdateCourse.Arn}/invocations
+        httpMethod: POST
+        type: aws
+        passthroughBehavior: "WHEN_NO_TEMPLATES"
+        requestTemplates:
+          application/json: |
+            {
+              "courseId": "$input.params('courseId')",
+                "title" : $input.json('$.title'),
+                "authorId" : $input.json('$.authorId'),
+                "length" : $input.json('$.length'),
+                "category" : $input.json('$.category'),
+                "watchHref" : $input.json('$.watchHref')
+            }
+        responses:
+          default:
+            statusCode: 200
+            schema:
+              $ref: '#/components/responses/Empty'
+      summary: Updates the course's info
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: number
+      requestBody:
+        description: course info
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Course'
+      responses:
+        200:
+          $ref: '#/components/responses/Empty'
+    delete:
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DeleteCourse.Arn}/invocations
+        httpMethod: POST
+        type: aws
+        passthroughBehavior: "WHEN_NO_TEMPLATES"
+        requestTemplates:
+          application/json: |
+            {
+              "courseId": "$input.params('courseId')"
+            }
+        responses:
+          default:
+            statusCode: 200
+            schema:
+              $ref: '#/components/responses/Empty'
+      summary: Delete a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: number
+      responses:
+        200:
+          $ref: '#/components/responses/Empty'
+
+
+components:
+  schemas:
+    Author:
+      title: Author
+      type: object
+      properties:
+        id:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+      required:
+        - id
+        - firstName
+        - lastName
+    AuthorList:
+      title: List of authors
+      type: array
+      items:
+        $ref: '#/components/schemas/Author'
+    Course:
+      type: object
+      required:
+        - title
+        - authorId
+        - length
+        - category
+      properties:
+        title:
+          type: string
+        authorId:
+          type: string
+        length:
+          type: string
+        category:
+          type: string
+    CourseList:
+      title: List of courses
+      type: array
+      items:
+        $ref: '#/components/schemas/Course'
+
+  responses:
+    Author:
+      description: List of authors
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Author'
+    AuthorAll:
+      description: List of authora
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthorList'
+    Course:
+      description: List of courses
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Course'
+    CourseAll:
+      description: List of courses
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CourseList'
+    Empty:
+      description: List of courses
+      content:
+        application/json:
+          schema:
+            type: object
+
+      

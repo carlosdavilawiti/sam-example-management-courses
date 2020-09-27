@@ -7,7 +7,7 @@ exports.handler = async (event, context, callback) => {
 	console.log('Event: ', JSON.stringify(event, null, 2));
 
 	const itemData = {
-		id: event.id,
+		id: event.courseId,
 		title: event.title,
 		watchHref: event.watchHref,
 		authorId: event.authorId,

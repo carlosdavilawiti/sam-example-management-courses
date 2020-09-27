@@ -1,9 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Transform: 'AWS::Serverless-2016-10-31'
-
-Description: >
-  Demo uso básico de SAM AWS. Sistema para gestión de cursos
-
+Transform: AWS::Serverless-2016-10-31
+Description: "Demo uso b\xE1sico de SAM AWS. Sistema para gesti\xF3n de cursos\n"
 Globals:
   Function:
     Timeout: 300
@@ -17,25 +14,25 @@ Parameters:
     Default: dev
     Type: String
     AllowedValues:
-      - dev
-      - qa
-      - prod
+    - dev
+    - qa
+    - prod
   NameProject:
     Type: String
     Default: management-courses
   SuffixParametersName:
     Type: String
-    Default: ""
+    Default: ''
   SwaggerS3File:
     Description: '"openapi.yaml" file location'
     Default: ./openapi.yaml
     Type: String
   TableCoursesName:
     Type: String
-    Default: "courses"
+    Default: courses
   TableAuthorsName:
     Type: String
-    Default: "authors"
+    Default: authors
 Resources:
   LambdaRole:
     Type: AWS::IAM::Role
@@ -43,219 +40,234 @@ Resources:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
+        - Effect: Allow
+          Action:
+          - sts:AssumeRole
+          Principal:
+            Service:
+            - states.amazonaws.com
+            - lambda.amazonaws.com
+      Policies:
+      - PolicyName: StepFunctionsPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
           - Effect: Allow
             Action:
-              - 'sts:AssumeRole'
-            Principal:
-              Service:
-                - states.amazonaws.com
-                - lambda.amazonaws.com
-      Policies:
-        - PolicyName: StepFunctionsPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - 'logs:*'
-                  - 'lambda:*'
-                  - 'dynamodb:*'
-                  - 's3:*'
-                Resource: '*'
-
+            - logs:*
+            - lambda:*
+            - dynamodb:*
+            - s3:*
+            Resource: '*'
   ClientStorage:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub ${NameProject}${SuffixParametersName}--client
+      BucketName:
+        Fn::Sub: ${NameProject}${SuffixParametersName}--client
       AccessControl: PublicRead
       WebsiteConfiguration:
         IndexDocument: index.html
         ErrorDocument: index.html
       BucketEncryption:
         ServerSideEncryptionConfiguration:
-          - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256
+        - ServerSideEncryptionByDefault:
+            SSEAlgorithm: AES256
   BucketPolicyClient:
-    Type: 'AWS::S3::BucketPolicy'
+    Type: AWS::S3::BucketPolicy
     Properties:
       PolicyDocument:
         Statement:
-          - Sid: PublicReadForGetBucketObjects
-            Effect: Allow
-            Principal: '*'
-            Action:
-              - 's3:GetObject'
-            Resource: !Sub arn:aws:s3:::${NameProject}${SuffixParametersName}--client/*
+        - Sid: PublicReadForGetBucketObjects
+          Effect: Allow
+          Principal: '*'
+          Action:
+          - s3:GetObject
+          Resource:
+            Fn::Sub: arn:aws:s3:::${NameProject}${SuffixParametersName}--client/*
       Bucket:
         Ref: ClientStorage
   AuthorsTable:
     Type: AWS::DynamoDB::Table
     Properties:
       AttributeDefinitions:
-        - AttributeName: 'id'
-          AttributeType: 'S'
+      - AttributeName: id
+        AttributeType: S
       KeySchema:
-        - AttributeName: 'id'
-          KeyType: 'HASH'
+      - AttributeName: id
+        KeyType: HASH
       ProvisionedThroughput:
         ReadCapacityUnits: '5'
         WriteCapacityUnits: '5'
-      TableName: !Sub ${TableAuthorsName}
+      TableName:
+        Fn::Sub: ${TableAuthorsName}
   CoursesTable:
     Type: AWS::DynamoDB::Table
     Properties:
       AttributeDefinitions:
-        - AttributeName: 'id'
-          AttributeType: 'S'
+      - AttributeName: id
+        AttributeType: S
       KeySchema:
-        - AttributeName: 'id'
-          KeyType: 'HASH'
+      - AttributeName: id
+        KeyType: HASH
       ProvisionedThroughput:
         ReadCapacityUnits: '5'
         WriteCapacityUnits: '5'
-      TableName: !Sub ${TableCoursesName}
-  # Api Gateway -
+      TableName:
+        Fn::Sub: ${TableCoursesName}
   ManagementCoursesApi:
     Type: AWS::Serverless::Api
     Properties:
       Name: management-courses-api
-      StageName: !Ref ApiGatewayStageName
+      StageName:
+        Ref: ApiGatewayStageName
       DefinitionBody:
-        'Fn::Transform':
+        Fn::Transform:
           Name: AWS::Include
           Parameters:
-            Location: !Ref SwaggerS3File
-    #  Models:
-    #    Course:
-    #      type: object
-    #      required:
-    #        - title
-    #        - authorId
-    #        - length
-    #        - category
-    #      properties:
-    #        title:
-    #          type: string
-    #        authorId:
-    #          type: string
-    #        length:
-    #          type: string
-    #        category:
-    #          type: string
-
-  # Functions
+            Location:
+              Ref: SwaggerS3File
   GetAllAuthors:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: get-all-authors/
+      CodeUri: s3://management-courses-deploy/7507f35a11e7faecb1f33274901f6f91
       Handler: index.handler
-      Role: !GetAtt LambdaRole.Arn
+      Role:
+        Fn::GetAtt:
+        - LambdaRole
+        - Arn
       Events:
         ApiGet:
           Type: Api
           Properties:
-            RestApiId: !Ref ManagementCoursesApi
+            RestApiId:
+              Ref: ManagementCoursesApi
             Path: /author
             Method: get
       Environment:
         Variables:
-          DynamoTable: !Ref AuthorsTable
+          DynamoTable:
+            Ref: AuthorsTable
       Layers:
-        - !Ref CommonFunctionsLayer
+      - Ref: CommonFunctionsLayer
   GetAllCourses:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: get-all-courses/
+      CodeUri: s3://management-courses-deploy/e8f0b727a3c88a72322dd8300f141828
       Handler: index.handler
-      Role: !GetAtt LambdaRole.Arn
+      Role:
+        Fn::GetAtt:
+        - LambdaRole
+        - Arn
       Events:
         ApiGet:
           Type: Api
           Properties:
-            RestApiId: !Ref ManagementCoursesApi
+            RestApiId:
+              Ref: ManagementCoursesApi
             Path: /course
             Method: get
       Environment:
         Variables:
-          DynamoTable: !Ref CoursesTable
+          DynamoTable:
+            Ref: CoursesTable
       Layers:
-        - !Ref CommonFunctionsLayer
+      - Ref: CommonFunctionsLayer
   GetCourse:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: get-course/
+      CodeUri: s3://management-courses-deploy/1373661d63df412e06ab53cde4aebaf7
       Handler: index.handler
-      Role: !GetAtt LambdaRole.Arn
+      Role:
+        Fn::GetAtt:
+        - LambdaRole
+        - Arn
       Events:
         ApiGet:
           Type: Api
           Properties:
-            RestApiId: !Ref ManagementCoursesApi
+            RestApiId:
+              Ref: ManagementCoursesApi
             Path: /course/{id}
             Method: get
       Environment:
         Variables:
-          DynamoTable: !Ref CoursesTable
+          DynamoTable:
+            Ref: CoursesTable
       Layers:
-        - !Ref CommonFunctionsLayer
+      - Ref: CommonFunctionsLayer
   SaveCourse:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: save-course/
+      CodeUri: s3://management-courses-deploy/cce8e92dc22d8c5bc0b5179aaaf11e07
       Handler: index.handler
-      Role: !GetAtt LambdaRole.Arn
+      Role:
+        Fn::GetAtt:
+        - LambdaRole
+        - Arn
       Events:
         ApiGet:
           Type: Api
           Properties:
-            RestApiId: !Ref ManagementCoursesApi
+            RestApiId:
+              Ref: ManagementCoursesApi
             Path: /course
             Method: post
       Environment:
         Variables:
-          DynamoTable: !Ref CoursesTable
+          DynamoTable:
+            Ref: CoursesTable
       Layers:
-        - !Ref CommonFunctionsLayer
+      - Ref: CommonFunctionsLayer
   UpdateCourse:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: update-course/
+      CodeUri: s3://management-courses-deploy/c9e82e5aa77368fee7cf98549867c154
       Handler: index.handler
-      Role: !GetAtt LambdaRole.Arn
+      Role:
+        Fn::GetAtt:
+        - LambdaRole
+        - Arn
       Events:
         ApiGet:
           Type: Api
           Properties:
-            RestApiId: !Ref ManagementCoursesApi
+            RestApiId:
+              Ref: ManagementCoursesApi
             Path: /course/{id}
             Method: put
       Environment:
         Variables:
-          DynamoTable: !Ref CoursesTable
+          DynamoTable:
+            Ref: CoursesTable
       Layers:
-        - !Ref CommonFunctionsLayer
+      - Ref: CommonFunctionsLayer
   DeleteCourse:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: delete-course/
+      CodeUri: s3://management-courses-deploy/ba21cf85c6e2844c1939a986f5b125e8
       Handler: index.handler
-      Role: !GetAtt LambdaRole.Arn
+      Role:
+        Fn::GetAtt:
+        - LambdaRole
+        - Arn
       Events:
         ApiGet:
           Type: Api
           Properties:
-            RestApiId: !Ref ManagementCoursesApi
+            RestApiId:
+              Ref: ManagementCoursesApi
             Path: /course/{id}
             Method: delete
       Environment:
         Variables:
-          DynamoTable: !Ref CoursesTable
+          DynamoTable:
+            Ref: CoursesTable
       Layers:
-        - !Ref CommonFunctionsLayer
+      - Ref: CommonFunctionsLayer
   CommonFunctionsLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
-      ContentUri: './lib'
+      ContentUri: s3://management-courses-deploy/8281ced3d45320cd4b974999c3ae0117
       CompatibleRuntimes:
-        - nodejs12.x
-      LicenseInfo: 'ISC'
+      - nodejs12.x
+      LicenseInfo: ISC

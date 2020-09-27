@@ -4,7 +4,8 @@ const dynamoLib = require('dynamo-lib');
 
 exports.handler = async (event, context, callback) => {
 	console.log('Event: ', JSON.stringify(event, null, 2));
-	callback(null, await dynamoLib.getAll(process.env.DynamoTable).map(item => {
+	const courses = await dynamoLib.getAll(process.env.DynamoTable);
+	callback(null,  courses.Items ? courses.Items.map(item => {
 		return {
 			id: item.id,
 			title: item.title,
@@ -13,5 +14,5 @@ exports.handler = async (event, context, callback) => {
 			length: item.length,
 			category: item.category
 		}
-	}))
+	}) : [] )
 };
